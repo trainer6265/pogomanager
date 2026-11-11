@@ -57,7 +57,7 @@ button.sm{padding:6px 10px;font-size:13px}
 .opp{display:inline-flex;align-items:center;gap:4px;background:var(--acc2);border-radius:999px;padding:4px 6px 4px 10px;margin:4px 4px 0 0;font-size:13px;font-weight:600}
 .opp button{padding:0 6px;background:transparent;font-size:16px;line-height:1}
 .note{font-size:12px;color:var(--sub);background:var(--card);border:1px dashed var(--line);border-radius:10px;padding:8px 10px;margin:10px 0}
-.ti{vertical-align:-2px;margin-right:3px}.mrow{display:flex;gap:12px;align-items:center}.av{position:relative;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.9);box-sizing:border-box;line-height:1}.avt{position:absolute;right:-7px;bottom:-7px;border-radius:50%;padding:3px;display:flex;border:2px solid var(--card)}.avt .ti{margin:0}.slot .av{margin-top:2px}.seg{display:flex;gap:6px}.seg button{flex:1}.seg button.on{background:var(--acc);color:#fff}
+.ti{vertical-align:-2px;margin-right:3px}.stars{color:#f59f00;margin-left:6px;letter-spacing:-1px;font-weight:800;white-space:nowrap}.stars.hundo{color:#e03131}.stars small{font-size:10px;margin-left:3px;letter-spacing:0}.mrow{display:flex;gap:12px;align-items:center}.av{position:relative;flex:none;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.9);box-sizing:border-box;line-height:1}.avt{position:absolute;right:-7px;bottom:-7px;border-radius:50%;padding:3px;display:flex;border:2px solid var(--card)}.avt .ti{margin:0}.slot .av{margin-top:2px}.seg{display:flex;gap:6px}.seg button{flex:1}.seg button.on{background:var(--acc);color:#fff}
 </style></head><body><div id="root"></div>
 <script type="application/json" id="state">{"v":1,"savedAt":0,"mons":[],"customSpecies":[],"customMoves":[]}</script>
 <script id="app">
@@ -199,8 +199,14 @@ function mvLabel(n){if(!n)return '-';var t=mt(n);return esc(n)+(t?'<span style="
 function findMon(id){return S.mons.filter(function(m){return m.id===id})[0]}
 function monName(m){return (m.shadow?'섀도 ':'')+m.species}
 
+var STAR_AVG=[3.7,8.7,11,13.5,15];
+function starsOf(iv){var t=iv[0]+iv[1]+iv[2];return t>=45?4:t>=37?3:t>=30?2:t>=23?1:0}
+function ivOf(m){if(m.iv)return m.iv;if(m.stars!=null&&m.stars!==''){var a=STAR_AVG[+m.stars];return [a,a,a]}return [15,15,15]}
+function monStars(m){return m.iv?starsOf(m.iv):(m.stars!=null&&m.stars!==''?+m.stars:null)}
+function starBadge(m,big){var n=monStars(m);if(n==null)return '';var t=n===4?'★★★':(n?'★'.repeat(n):'☆');
+ return '<span class="stars'+(n===4?' hundo':'')+'" style="font-size:'+(big?16:13)+'px" title="'+(n===4?'100%':n+'성')+'">'+t+(n===4?'<small>100%</small>':'')+'</span>'}
 function stats(m){var sp=SP[m.species];if(!sp||!m.cp)return null;
- var iv=m.iv||[15,15,15];var A=sp.a+iv[0],D=sp.d+iv[1],H=sp.s+iv[2];
+ var iv=ivOf(m);var A=sp.a+iv[0],D=sp.d+iv[1],H=sp.s+iv[2];
  var cpm=Math.sqrt(Math.max(10,m.cp)*10/(A*Math.sqrt(D)*Math.sqrt(H)));
  var atk=A*cpm,def=D*cpm,hp=Math.max(10,Math.floor(H*cpm));
  if(m.shadow){atk*=1.2;def*=0.8333}
@@ -241,7 +247,7 @@ function render(){var t=tab();
 window.addEventListener('hashchange',function(){render();window.scrollTo(0,0)});
 
 function monCard(m,extra){var sp=SP[m.species];var ty=sp?sp.t:[];
- return '<div class="card mon" data-act="open" data-id="'+m.id+'"><div class="bar" style="background:'+(TCOL[ty[0]]||'#999')+'"></div><div class="mrow">'+avatar(m,48)+'<div class="grow"><div class="top"><div class="nm">'+(m.fav?'<span class="fav">★</span> ':'')+esc(m.species)+(m.shadow?'<span class="badge shadow">섀도</span>':'')+'</div><div class="cp"><small>CP</small>'+(m.cp||'?')+'</div></div><div>'+ty.map(chip).join('')+'</div><div class="mv">'+mvLabel(m.fast)+((m.charged||[]).filter(Boolean).length?' · '+(m.charged||[]).filter(Boolean).map(mvLabel).join(' / '):'')+'</div>'+(extra||'')+'</div></div></div>'}
+ return '<div class="card mon" data-act="open" data-id="'+m.id+'"><div class="bar" style="background:'+(TCOL[ty[0]]||'#999')+'"></div><div class="mrow">'+avatar(m,48)+'<div class="grow"><div class="top"><div class="nm">'+(m.fav?'<span class="fav">★</span> ':'')+esc(m.species)+(m.shadow?'<span class="badge shadow">섀도</span>':'')+starBadge(m)+'</div><div class="cp"><small>CP</small>'+(m.cp||'?')+'</div></div><div>'+ty.map(chip).join('')+'</div><div class="mv">'+mvLabel(m.fast)+((m.charged||[]).filter(Boolean).length?' · '+(m.charged||[]).filter(Boolean).map(mvLabel).join(' / '):'')+'</div>'+(extra||'')+'</div></div></div>'}
 
 function vMine(){var list=S.mons.slice();var q=ui.q.trim();
  if(q)list=list.filter(function(m){return (m.species+' '+(m.note||'')+' '+(m.fast||'')+' '+(m.charged||[]).join(' ')).indexOf(q)>=0});
@@ -306,7 +312,7 @@ function assignRoles(ms,opps){var a=ms.slice();var lead;
  var sw=rest.filter(function(x){return x!==closer})[0];
  return [{role:'선봉',c:lead},{role:'교체',c:sw},{role:'마무리',c:closer}]}
 function avgMu(c,opps){return opps.reduce(function(s,o){return s+Math.min(2.5,matchup(c,o).v)},0)/opps.length}
-function project(m,cap){var sp=SP[m.species];if(!sp)return null;var iv=m.iv||[15,15,15];var A=sp.a+iv[0],D=sp.d+iv[1],H=sp.s+iv[2];
+function project(m,cap){var sp=SP[m.species];if(!sp)return null;var iv=ivOf(m);var A=sp.a+iv[0],D=sp.d+iv[1],H=sp.s+iv[2];
  var base=A*Math.sqrt(D)*Math.sqrt(H)/10;var cur=Math.sqrt(m.cp/base);var tgt=Math.min(Math.sqrt(cap/base),0.8403);
  if(tgt<=cur*1.01)return null;var atk=A*tgt,def=D*tgt,hp=Math.floor(H*tgt);if(m.shadow){atk*=1.2;def*=0.8333}
  return {cp:Math.floor(base*tgt*tgt),prod:atk*def*hp,xl:tgt>0.7903,maxed:tgt>=0.8403}}
@@ -494,7 +500,9 @@ function monForm(mode,m,flash){m=m||{};var title={add:'포켓몬 추가',edit:'�
  if(showMoves)h+='<label>노말어택</label><select id="f_fast"></select><label>스페셜어택 1</label><select id="f_c1"></select><label>스페셜어택 2 (해방했다면)</label><select id="f_c2"></select>';
  if(showMisc){var iv=m.iv||['','',''];
   h+='<label><input type="checkbox" id="f_sh" style="width:auto"'+(m.shadow?' checked':'')+'> 섀도 포켓몬</label>';
-  h+='<label>개체값 IV (선택 · 공/방/체 0~15)</label><div class="grid3"><input id="f_i0" type="number" inputmode="numeric" value="'+iv[0]+'" placeholder="공"><input id="f_i1" type="number" inputmode="numeric" value="'+iv[1]+'" placeholder="방"><input id="f_i2" type="number" inputmode="numeric" value="'+iv[2]+'" placeholder="체"></div>';
+  h+='<label>개체값 IV (선택 · 공/방/체 0~15)</label><div class="grid3"><input id="f_i0" type="number" inputmode="numeric" value="'+iv[0]+'" placeholder="공"><input id="f_i1" type="number" inputmode="numeric" value="'+iv[1]+'" placeholder="방"><input id="f_i2" type="number" inputmode="numeric" value="'+iv[2]+'" placeholder="체"></div><div class="muted" id="f_ivst" style="margin-top:4px"></div>';
+  var stv=(m.stars!=null&&m.stars!=='')?String(m.stars):'';
+  h+='<label>별 (공·방·체를 모를 때만)</label><select id="f_st">'+[['','모름'],['0','☆ 0개'],['1','★ 1개'],['2','★★ 2개'],['3','★★★ 3개'],['4','★★★ 100% (빨간 별)']].map(function(o){return '<option value="'+o[0]+'"'+(stv===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')+'</select>';
   h+='<label>메모 (선택)</label><input id="f_note" value="'+esc(m.note||'')+'" placeholder="예: 커뮤데이 기술, 슈퍼리그용">'}
  h+='<div class="muted" id="f_err" style="color:var(--bad)"></div><div class="btns"><button data-x="cancel">취소</button>'+(mode==='add'?'<button data-x="more">저장 후 계속</button>':'')+'<button class="pri" data-x="ok">저장</button></div>';
  if(flash)h=h.replace('<h2>','<div class="note" style="margin-top:0;color:var(--good);font-weight:700">✓ '+esc(flash)+'</div><h2>');
@@ -510,6 +518,11 @@ function monForm(mode,m,flash){m=m||{};var title={add:'포켓몬 추가',edit:'�
    $('f_ct1').addEventListener('change',refreshMoves);$('f_ct2').addEventListener('change',refreshMoves);refreshMoves()}
   if(showSpecies){$('f_sp').addEventListener('input',refreshCustom);$('f_sp').addEventListener('change',refreshCustom)}
   refreshMoves();
+  function ivLive(){var a=$('f_i0'),b=$('f_i1'),c=$('f_i2'),out=$('f_ivst'),st=$('f_st');if(!a||!out)return;var v=[a.value,b.value,c.value];
+   if(v.every(function(x){return x!==''})){var iv=v.map(function(x){return Math.max(0,Math.min(15,+x))});var n=starsOf(iv),t=iv[0]+iv[1]+iv[2];
+    out.innerHTML='→ '+starBadge({iv:iv})+' 합계 '+t+' ('+Math.round(t/45*100)+'%)';st.disabled=true;st.value=String(n)}
+   else{out.textContent='';st.disabled=false}}
+  ['f_i0','f_i1','f_i2'].forEach(function(id){var el=$(id);if(el)el.addEventListener('input',ivLive)});ivLive();
   bg.addEventListener('click',function(e){var x=e.target.getAttribute('data-x');if(x==='cancel')closeModal();if(x==='ok')submit(false);if(x==='more')submit(true)});
   function submit(more){var err=$('f_err');var o={};
    if(showSpecies){var n=$('f_sp').value.trim();if(!n){err.textContent='포켓몬 이름을 입력하세요.';return}
@@ -518,7 +531,7 @@ function monForm(mode,m,flash){m=m||{};var title={add:'포켓몬 추가',edit:'�
     o.species=n}
    if(showCP){var cp=parseInt($('f_cp').value,10);if(!(cp>=10)){err.textContent='CP를 입력하세요.';return}o.cp=cp}
    if(showMoves){o.fast=$('f_fast').value;o.charged=[$('f_c1').value,$('f_c2').value].filter(Boolean)}
-   if(showMisc){o.shadow=$('f_sh').checked;var iv=[$('f_i0').value,$('f_i1').value,$('f_i2').value];o.iv=iv.every(function(v){return v!==''})?iv.map(function(v){return Math.max(0,Math.min(15,+v))}):null;o.note=$('f_note').value.trim()}
+   if(showMisc){o.shadow=$('f_sh').checked;var iv=[$('f_i0').value,$('f_i1').value,$('f_i2').value];o.stars=$('f_st').value===''?null:+$('f_st').value;o.iv=iv.every(function(v){return v!==''})?iv.map(function(v){return Math.max(0,Math.min(15,+v))}):null;if(o.iv)o.stars=starsOf(o.iv);o.note=$('f_note').value.trim()}
    commit(mode,m,o);closeModal();render();if(mode!=='add')openDetail(m.id);else if(more){monForm('add',null,(o.shadow?'섀도 ':'')+o.species+' 저장됨 · 지금 '+S.mons.length+'마리');var sp=document.getElementById('f_sp');if(sp)sp.focus()}}
  })}
 function commit(mode,m,o){var t=now(),log;
@@ -531,7 +544,7 @@ function commit(mode,m,o){var t=now(),log;
 
 function openDetail(id){var m=findMon(id);if(!m)return;var sp=SP[m.species];var st=stats(m);
  var h='<div class="mrow" style="margin-bottom:6px">'+avatar(m,64)+'<div class="grow"><h2>'+(m.fav?'<span class="fav">★</span> ':'')+esc(m.species)+(m.shadow?'<span class="badge shadow">섀도</span>':'')+'</h2><div>'+(sp?sp.t.map(chip).join(''):'')+'</div></div></div>';
- h+='<div style="margin-top:8px"><b style="font-size:22px">CP '+m.cp+'</b>'+(m.iv?' <span class="muted">IV '+m.iv.join('/')+'</span>':'')+'</div>';
+ h+='<div style="margin-top:8px"><b style="font-size:22px">CP '+m.cp+'</b> '+starBadge(m,true)+(m.iv?' <span class="muted">IV '+m.iv.join('/')+'</span>':(m.stars!=null?' <span class="muted">(별만 입력)</span>':''))+'</div>';
  h+='<div class="mv">노말어택: '+mvLabel(m.fast)+'<br>스페셜어택: '+((m.charged||[]).filter(Boolean).map(mvLabel).join(' / ')||'-')+'</div>';
  if(m.note)h+='<div class="note">'+esc(m.note)+'</div>';
  var lg=[];if(m.cp<=1500)lg.push('슈퍼');if(m.cp<=2500)lg.push('하이퍼');lg.push('마스터');
