@@ -223,9 +223,13 @@ function reasons(r,defs){var o=[];
 
 /* ---------- 렌더 ---------- */
 var TABS=[['mine','내 포켓몬'],['pvp','GO배틀리그'],['raid','레이드'],['gym','체육관·로켓단'],['backup','백업·설정']];
-var CUPS_KEYS={laic:1,halloween:1,competitive:1,retro:1,four:1,fantasy:1,little:1,naic:1,sunshine:1,summer:1,fantasyU:1,elemental:1,scroll:1,evolution:1,masterPremier:1,kanto:1,spring:1,jungle:1,electric:1,series:1,custom:1};
-var ui={q:'',sort:'cp',ftype:'',league:'great',boss:'',bt1:'',bt2:'',opps:[],popps:[],cup:{preset:'laic',cap:1500,types:[]},pvpRes:null,raidRes:null,gymRes:null};
-try{var U=JSON.parse(sessionStorage.getItem('pogo-ui')||'null');if(U)Object.assign(ui,U,{pvpRes:null,raidRes:null,gymRes:null});if(!Array.isArray(ui.popps))ui.popps=[];if(!ui.cup||!Array.isArray(ui.cup.types)||!CUPS_KEYS[ui.cup.preset])ui.cup={preset:'laic',cap:1500,types:[]}}catch(e){}
+var CUPS={
+laic:{g:'진행 중 (11/10~11/25)',n:'2026 GO 챔피언십LA컵',cap:1500,types:[],ban:['불꽃','악','강철','페어리'],banMon:['럭키','잠만보','킹드라','요가램','파비코리','저승갓숭','토오'],noLegend:1,end:'2026-11-25',note:'다꼬리·마자용·미라몽 등 이 프로그램 도감에 없는 금지 포켓몬도 있어요. 메가진화는 참가할 수 없어요.'},
+megacatch:{g:'곧 시작 (11/24~12/1)',n:'메가 캐치컵',cap:1500,types:[],end:'2026-12-01',note:'"황혼의 여정" 시즌(9/9~12/1)에 잡은 포켓몬만 참가할 수 있어요. 이 조건은 프로그램이 확인하지 못하니 직접 골라 주세요. 환상의 포켓몬은 참가할 수 없고, 메가진화는 참가할 수 있어요.'},
+custom:{g:'직접 만들기',n:'직접 설정',cap:1500,types:[]}};
+(function(){var now=Date.now();Object.keys(CUPS).forEach(function(k){var c=CUPS[k];if(c.end&&now>Date.parse(c.end+'T23:59:59+09:00'))delete CUPS[k]})})();
+var ui={q:'',sort:'cp',ftype:'',league:'great',boss:'',bt1:'',bt2:'',opps:[],popps:[],cup:{preset:(CUPS.laic?'laic':'custom'),cap:1500,types:[]},pvpRes:null,raidRes:null,gymRes:null};
+try{var U=JSON.parse(sessionStorage.getItem('pogo-ui')||'null');if(U)Object.assign(ui,U,{pvpRes:null,raidRes:null,gymRes:null});if(!Array.isArray(ui.popps))ui.popps=[];if(!ui.cup||!Array.isArray(ui.cup.types)||!CUPS[ui.cup.preset])ui.cup={preset:(CUPS.laic?'laic':'custom'),cap:1500,types:[]}}catch(e){}
 function saveUI(){try{sessionStorage.setItem('pogo-ui',JSON.stringify({q:ui.q,sort:ui.sort,ftype:ui.ftype,league:ui.league,boss:ui.boss,bt1:ui.bt1,bt2:ui.bt2,opps:ui.opps,popps:ui.popps,cup:ui.cup}))}catch(e){}}
 function tab(){var h=(location.hash||'').slice(1);return TABS.some(function(t){return t[0]===h})?h:'mine'}
 var root=document.getElementById('root');
@@ -251,28 +255,6 @@ function vMine(){var list=S.mons.slice();var q=ui.q.trim();
  else{h+='<div class="muted" style="margin:10px 2px">'+list.length+'마리 표시 · 카드를 누르면 강화/진화/기술변경</div>';h+=list.map(function(m){return monCard(m)}).join('')}
  return h}
 
-var CUPS={
-laic:{g:'지금 진행 중 (11/10~11/25)',n:'2026 GO 챔피언십LA컵',cap:1500,types:[],ban:['불꽃','악','강철','페어리'],banMon:['럭키','잠만보','킹드라','요가램','파비코리','저승갓숭','토오'],noLegend:1,note:'다꼬리·마자용·미라몽 등 이 프로그램 도감에 없는 금지 포켓몬도 있어요. 메가진화는 참가할 수 없어요.'},
-halloween:{g:'황혼의 여정 시즌 (2026.9~12)',n:'메가 핼러윈컵',cap:1500,types:['벌레','독','고스트','악','페어리'],note:'메가진화 포켓몬도 참가할 수 있어요.'},
-competitive:{g:'황혼의 여정 시즌 (2026.9~12)',n:'경쟁심컵',cap:1500,types:['격투','에스퍼','악'],banMon:['가디안']},
-retro:{g:'황혼의 여정 시즌 (2026.9~12)',n:'레트로컵',cap:1500,types:[],ban:['악','강철','페어리']},
-four:{g:'황혼의 여정 시즌 (2026.9~12)',n:'메가 4색컵',cap:1500,types:['풀','불꽃','물','전기'],note:'메가진화 포켓몬도 참가할 수 있어요.'},
-fantasy:{g:'황혼의 여정 시즌 (2026.9~12)',n:'판타지컵 (슈퍼리그)',cap:1500,types:['드래곤','강철','페어리']},
-little:{g:'황혼의 여정 시즌 (2026.9~12)',n:'리틀컵',cap:500,types:[],note:'진화할 수 있고 아직 한 번도 진화하지 않은 포켓몬만 참가할 수 있어요. 이 조건은 프로그램이 확인하지 못하니 직접 골라 주세요.'},
-naic:{g:'새로운 발걸음 시즌 (2026.6~9)',n:'NAIC 2026컵',cap:1500,types:['페어리','노말','에스퍼','물'],ban:['악','풀','강철'],banMon:['픽시','푸크린','강챙이','내루미','럭키','랜턴','루기아','요가램','내룸벨트','크레세리아','멜리시'],note:'메가진화는 참가할 수 없어요.'},
-sunshine:{g:'새로운 발걸음 시즌 (2026.6~9)',n:'선샤인컵',cap:1500,types:['노말','불꽃','풀','땅'],banMon:['리자몽']},
-summer:{g:'새로운 발걸음 시즌 (2026.6~9)',n:'섬머컵',cap:1500,types:['노말','불꽃','물','풀','전기','벌레']},
-fantasyU:{g:'새로운 발걸음 시즌 (2026.6~9)',n:'판타지컵 (하이퍼리그)',cap:2500,types:['드래곤','강철','페어리']},
-elemental:{g:'새로운 발걸음 시즌 (2026.6~9)',n:'자연계컵',cap:1500,types:['불꽃','물','얼음','바위']},
-scroll:{g:'새로운 발걸음 시즌 (2026.6~9)',n:'스크롤컵',cap:1500,types:['물','격투','악']},
-evolution:{g:'새로운 발걸음 시즌 (2026.6~9)',n:'진화컵',cap:1500,types:[],note:'한 번 진화했고 한 번 더 진화할 수 있는 포켓몬만 참가할 수 있어요. 이 조건은 직접 골라 주세요.'},
-masterPremier:{g:'새로운 발걸음 시즌 (2026.6~9)',n:'마스터 프리미어',cap:1e9,types:[],noLegend:1},
-kanto:{g:'생생한 추억 시즌 (2026.3~6)',n:'관동컵',cap:1500,types:[],dex:[1,151],note:'관동지방 포켓몬(도감 1~151번)만 참가할 수 있어요.'},
-spring:{g:'생생한 추억 시즌 (2026.3~6)',n:'스프링컵',cap:1500,types:['물','풀','페어리'],banMon:['솜솜코','로즈레이드']},
-jungle:{g:'생생한 추억 시즌 (2026.3~6)',n:'정글컵',cap:1500,types:['노말','풀','전기','독','땅','비행','벌레','악']},
-electric:{g:'생생한 추억 시즌 (2026.3~6)',n:'전기컵',cap:1500,types:['전기'],banMon:['메더']},
-series:{g:'지난 시즌',n:'챔피언십2026 시리즈컵',cap:1500,types:['벌레','악','노말','드래곤'],ban:['격투','비행','강철']},
-custom:{g:'직접 만들기',n:'직접 설정',cap:1500,types:[]}};
 var LEGEND=['프리져','썬더','파이어','뮤츠','뮤','라이코','앤테이','스이쿤','루기아','칠색조','세레비','레지락','레지아이스','레지스틸','라티아스','라티오스','가이오가','그란돈','레쿠쟈','지라치','테오키스(디펜스폼)','디아루가','펄기아','히드런','레지기가스','기라티나(어나더폼)','기라티나(오리진폼)','크레세리아','다크라이','볼트로스(영물폼)','레시라무','제크로무','랜드로스(영물폼)','큐레무','멜탄','멜메탈'];
 var CUPMETA=['드래피온','대로트','따라큐','깜까미','오롱털','님피아','팬텀','고우스트','버랜지나','곤율거니','토오','크로뱃','독개굴','전툴라','눈여아','골루그','블래키','픽시','마릴리','메더(가라르)','무장조','요가램','랜턴','파비코리','개굴닌자','라프라스','메더','강챙이','누오','하리뭉','노보청','씨카이저','쥬레곤','아머까오','레지스틸','기라티나(어나더폼)','망나뇽','저승갓숭','메가니움','이상해꽃','리자몽','블레이범','대짱이','장크로다일','왕구리','랜턴','라이츄(알로라)','눈설왕','핫삼','엘레이드','요가램','깜까미','멜리시','파비코리','갸라도스','잠만보','해피너스'];
 function cupRule(){if(ui.league!=='cup')return null;var b=CUPS[ui.cup.preset]||CUPS.custom;return {n:b.n,cap:ui.cup.cap,types:ui.cup.types,ban:b.ban||[],banMon:b.banMon||[],noLegend:b.noLegend,dex:b.dex,note:b.note}}
