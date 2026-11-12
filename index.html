@@ -175,6 +175,63 @@ function moveCombo(m,my,defs,T){var f=PF[m.fast];var chs=(m.charged||[]).filter(
  return {dpt:dpt,sh:[s0.d,s1.d,s2.d],first:firstTurns,cheap:cheap,nuke:nuke,cov:cov,bait:bait,fturn:f.t,
   speed:1,covB:1+0.012*cov+(bait?0.05:0)}}
 function survTurns(st){return Math.max(12,Math.min(40,Math.sqrt(st.def*st.hp)/7))}
+/* ===== 트레이너 배틀 1:1 시뮬레이션 (간이) ===== */
+/* 기술의 능력 변화 효과: s=자신, o=상대, a=공격, d=방어 (단계) */
+var MOVEFX={'그로우펀치':{s:{a:1}},'마지막일침':{s:{a:1}},'니트로차지':{s:{a:1}},'개척하기':{s:{a:1}},'트리플악셀':{s:{a:1}},'분노의주먹':{s:{a:1}},'드레인펀치':{s:{d:1}},
+ '얼어붙은바람':{o:{a:-1}},'덤벼들기':{o:{a:-1}},'브레이킹스위프':{o:{a:-1}},'거품광선':{o:{a:-1}},'매지컬플레임':{o:{a:-1}},'깃털댄스':{o:{a:-2}},
+ '사이코팽':{o:{d:-1}},'애시드봄':{o:{d:-2}},
+ '브레이브버드':{s:{d:-3}},'인파이트':{s:{d:-2}},'와일드볼트':{s:{d:-2}},'오버히트':{s:{a:-2}},'엄청난힘':{s:{a:-1,d:-1}},'용성군':{s:{a:-2}},'리프스톰':{s:{a:-2}},'사이코부스트':{s:{a:-2}}};
+var STAGE=[0.5,4/7,2/3,0.8,1,1.25,1.5,1.75,2];
+function stg(n){return STAGE[Math.max(-4,Math.min(4,n))+4]}
+var _cap=1500,_oppCache={};
+function oppFighter(name){var key=name+'|'+_cap;if(_oppCache[key]!==undefined)return _oppCache[key];
+ var sp=SP[name],L=LS[name];if(!sp||!L||!PF[L.rec.fast]){_oppCache[key]=null;return null}
+ var iv=_cap>1e8?[15,15,15]:[5,15,15];var A=sp.a+iv[0],D=sp.d+iv[1],H=sp.s+iv[2];
+ var cpm=Math.min(0.8403,Math.sqrt(Math.min(_cap,99999)*10/(A*Math.sqrt(D)*Math.sqrt(H))));
+ var f={name:name,types:sp.t,atk:A*cpm,def:D*cpm,hp:Math.floor(H*cpm),fast:L.rec.fast,charged:L.rec.ch.filter(function(n){return PC[n]})};
+ if(!f.charged.length)f=null;_oppCache[key]=f;return f}
+function myFighter(x){if(!PF[x.m.fast])return null;var ch=(x.m.charged||[]).filter(function(n){return PC[n]});if(!ch.length)return null;
+ return {name:x.m.species,types:x.st.types,atk:x.st.atk,def:x.st.def,hp:x.st.hp,fast:x.m.fast,charged:ch}}
+function pvpDmg(a,d,move,power,as,ds){var t=mt(move);var m=(t?eff(t,d.types):1)*(t&&a.types.indexOf(t)>=0?1.2:1);
+ return Math.floor(0.5*power*(a.atk*stg(as.a))/(d.def*stg(ds.d))*m*1.3)+1}
+function simulate(A,B,shA,shB){
+ var S=[{f:A,hp:A.hp,en:0,sh:shA,cd:0,b:{a:0,d:0}},{f:B,hp:B.hp,en:0,sh:shB,cd:0,b:{a:0,d:0}}];
+ for(var turn=0;turn<300;turn++){
+  var acts=[null,null];
+  for(var i=0;i<2;i++){var me=S[i],op=S[1-i];if(me.cd>0)continue;
+   var ch=me.f.charged.filter(function(n){return me.en>=PC[n].e});
+   if(ch.length){var dm=function(n){return pvpDmg(me.f,op.f,n,PC[n].p,me.b,op.b)};
+    var cheap=ch.slice().sort(function(x,y){return PC[x].e-PC[y].e})[0],big=ch.slice().sort(function(x,y){return dm(y)-dm(x)})[0];
+    var nukeAll=me.f.charged.slice().sort(function(x,y){return dm(y)-dm(x)})[0];
+    var pick=null;
+    if(op.sh>0)pick=cheap;
+    else if(dm(big)>=op.hp)pick=big;
+    else if(big===nukeAll)pick=big;
+    else{var fdm=pvpDmg(op.f,me.f,op.f.fast,PF[op.f.fast].p,op.b,me.b);if(me.hp<=fdm*3)pick=big}
+    if(pick){acts[i]={c:pick};continue}}
+   acts[i]={fast:1};me.cd=PF[me.f.fast].t}
+  /* 스페셜어택: 공격이 높은 쪽 먼저 */
+  var order=S[0].f.atk*stg(S[0].b.a)>=S[1].f.atk*stg(S[1].b.a)?[0,1]:[1,0];
+  order.forEach(function(i){var a=acts[i];if(!a||!a.c)return;var me=S[i],op=S[1-i];if(me.hp<=0)return;
+   me.en-=PC[a.c].e;var d=pvpDmg(me.f,op.f,a.c,PC[a.c].p,me.b,op.b);
+   if(op.sh>0&&(d>=op.hp||d>=op.f.hp*0.3)){op.sh--;d=1}
+   op.hp-=d;var fx=MOVEFX[a.c];
+   if(fx){if(fx.s){me.b.a+=fx.s.a||0;me.b.d+=fx.s.d||0}if(fx.o){op.b.a+=fx.o.a||0;op.b.d+=fx.o.d||0}
+    ['a','d'].forEach(function(k){me.b[k]=Math.max(-4,Math.min(4,me.b[k]));op.b[k]=Math.max(-4,Math.min(4,op.b[k]))})}});
+  if(S[0].hp<=0||S[1].hp<=0)break;
+  /* 노말어택: 끝나는 턴에 대미지 */
+  var hits=[0,0];
+  for(var j=0;j<2;j++){var me2=S[j];if(me2.cd>0){me2.cd--;if(me2.cd===0){var fm=PF[me2.f.fast];hits[1-j]=pvpDmg(me2.f,S[1-j].f,me2.f.fast,fm.p,me2.b,S[1-j].b);me2.en=Math.min(100,me2.en+fm.e)}}}
+  S[0].hp-=hits[0];S[1].hp-=hits[1];
+  if(S[0].hp<=0||S[1].hp<=0)break}
+ var a=S[0],b=S[1];
+ if(b.hp<=0&&a.hp>0)return 500+500*a.hp/a.f.hp;
+ if(a.hp<=0&&b.hp>0)return 500*(1-b.hp/b.f.hp);
+ if(a.hp<=0&&b.hp<=0)return 500;
+ return 500*(1-b.hp/b.f.hp)+500*a.hp/a.f.hp-250}
+function simRating(x,oName){var A=myFighter(x),B=oppFighter(oName);if(!A||!B)return null;
+ return 0.25*simulate(A,B,0,0)+0.5*simulate(A,B,1,1)+0.25*simulate(A,B,2,2)}
+
 function bulkLabel(name){var sp=SP[name];if(!sp)return '';var r=Math.sqrt(sp.d*sp.s)/sp.a;return r<0.8?'<span class="bad">🥚 유리몸</span>':r>1.1?'<span class="good">🛡️ 튼튼함</span>':'⚖️ 균형형'}
 function comboText(m,st){return '';var c=moveCombo(m,st.types,null,survTurns(st));if(!c)return '';
  return bulkLabel(m.species)+' · 첫 스페셜어택('+esc(c.cheap)+')까지 <b>'+c.first+'턴</b> · 쉴드 0/1/2개일 때 턴당 대미지 '+c.sh.map(function(v){return v.toFixed(1)}).join(' / ')+(c.fturn>=4?' · <span class="bad">무거운 노말어택('+c.fturn+'턴): 교체·스페셜 타이밍 불리</span>':'')+' · 공격 커버 '+c.cov+'/18'+(c.bait?' · 미끼+필살 조합 ✓':'')}
@@ -342,7 +399,7 @@ function vPvp(){var h='<div class="seg">'+[['great','슈퍼'],['ultra','하이�
  if(r.skipped)h+='<div class="note">기술이 비어 있거나 도감에 없는 포켓몬 '+r.skipped+'마리는 계산에서 빠졌어요.</div>';
  return h}
 function goodTypes(defs){return TYPES.map(function(t){return [t,eff(t,defs)]}).filter(function(x){return x[1]>1}).sort(function(a,b){return b[1]-a[1]}).map(function(x){return x[0]})}
-function matchup(c,o){var my=c.st.types;var fm=c.m.fast?moveMult(c.m.fast,my,o.types):0.7;var best=null;
+function matchup(c,o){var sr=simRating(c,o.name);if(sr!=null)return {v:sr/500,why:''};var my=c.st.types;var fm=c.m.fast?moveMult(c.m.fast,my,o.types):0.7;var best=null;
  (c.m.charged||[]).filter(Boolean).forEach(function(n){var v=moveMult(n,my,o.types);if(!best||v>best.v)best={n:n,v:v}});
  var cm=best?best.v:0.7;var inc=Math.max.apply(null,o.types.map(function(t){return eff(t,my)}));
  var v=(0.5*fm+0.5*cm)/inc;var T1=survTurns(c.st);var c1=moveCombo(c.m,my,o.types,T1),c0=moveCombo(c.m,my,null,T1);if(c1&&c0&&c0.dpt>0)v=(c1.dpt/c0.dpt)/inc;var why=[];
@@ -400,7 +457,7 @@ function growth(c,teams,opps,cap,mx){var tips={},order=[];
   tm.sort(function(a,b){return b.x.ind-a.x.ind});
   tm.slice(0,3).forEach(function(r){r.ls.forEach(function(l){tip(r.x,tmTag(l),l)})})}
  return order.map(function(id){return tips[id]})}
-function runPvp(){var cap=ui.league==='cup'?(+ui.cup.cap||1500):{great:1500,ultra:2500,master:1e9}[ui.league];var skipped=0;var opps=ui.popps.slice();
+function runPvp(){var cap=ui.league==='cup'?(+ui.cup.cap||1500):{great:1500,ultra:2500,master:1e9}[ui.league];_cap=cap;var skipped=0;var opps=ui.popps.slice();
  var c=S.mons.filter(function(m){var sp=SP[m.species];return (m.cp||0)<=cap&&(!sp||cupOK(m.species))}).map(function(m){var st=stats(m);if(!st||!m.fast||!(m.charged||[]).some(Boolean)){skipped++;return null}return {m:m,st:st}}).filter(Boolean);
  if(c.length<3)return {err:(ui.league==='cup'?'이 컵 규칙(CP·타입)에 맞는':'이 리그에 낼 수 있는')+' 포켓몬(기술 입력 완료)이 3마리 미만이에요.'};
  var mx=Math.max.apply(null,c.map(function(x){return x.st.prod}));
@@ -409,13 +466,14 @@ function runPvp(){var cap=ui.league==='cup'?(+ui.cup.cap||1500):{great:1500,ultr
   var cb=moveCombo(x.m,x.st.types,null,survTurns(x.st));x.combo=cb;x.rating=Math.pow(x.st.atk,0.75)*x.st.def*x.st.hp*(cb?cb.dpt*cb.speed*cb.covB:2.5);x._stab=stab;
 });
  var mxR=Math.max.apply(null,c.map(function(x){return x.rating}));
- c.forEach(function(x){x.ind=Math.pow(x.rating/mxR,ui.league==='master'?1:0.7)+(x.m.charged.filter(Boolean).length>1?0.03:0);
+ _metaCache=metaList().filter(function(n){return SP[n]&&cupOK(n)&&!ui.popps.some(function(o){return o.name===n})}).map(function(n){return {name:n,types:SP[n].t}});
+ c.forEach(function(x){var rs=[];x._mu={};_metaCache.forEach(function(o){var v=matchup(x,o).v;x._mu[o.name]=v;rs.push(Math.min(2,v))});x.metaAvg=rs.length?rs.reduce(function(a,b){return a+b},0)/rs.length:1});
+ c.forEach(function(x){x.ind=Math.pow(x.rating/mxR,ui.league==='master'?1:0.7)*(0.45+0.55*x.metaAvg)+(x.m.charged.filter(Boolean).length>1?0.03:0);
   x.pick=x.ind+(opps.length?avgMu(x,opps)*0.8:0)});
  c.sort(function(a,b){return b.pick-a.pick});
  var top=[],seen={};c.forEach(function(x){var k=x.m.species+(x.m.shadow?'*':'');if(top.length<24&&!seen[k]){seen[k]=1;top.push(x)}});
  if(top.length<3)return {err:'서로 다른 포켓몬이 3종 이상 필요해요.'};
  var res=[];
- _metaCache=metaList().filter(function(n){return SP[n]&&cupOK(n)&&!ui.popps.some(function(o){return o.name===n})}).map(function(n){return {name:n,types:SP[n].t}});top.forEach(function(x){x._mu=null});
  for(var i=0;i<top.length;i++)for(var j=i+1;j<top.length;j++)for(var k=j+1;k<top.length;k++){
   var A=top[i],B=top[j],C=top[k];if(A.m.species===B.m.species||A.m.species===C.m.species||B.m.species===C.m.species)continue;
   var tm=teamScore([A,B,C]);tm.score+=metaScore([A,B,C]);if(sameTypes(A,B)||sameTypes(A,C)||sameTypes(B,C))tm.score-=1.5;
