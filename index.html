@@ -122,7 +122,8 @@ function lab(sp,n,mode){var el=isElite(sp,n),b='';
  if(mode==='tm')b=tmName(sp,n);else if(mode==='unlock')b=el?'해방 후 대단한 기술머신 필요':'';else b=el?'이벤트 한정':'';
  return esc(n)+(b?' <span class="badge '+(el?'tmg':'tag')+'">'+b+'</span>':'')}
 function tmTag(l){return ['대단한 기술머신','스페셜 기술머신','노말 기술머신'].filter(function(t){return l.indexOf(t)>=0})[0]||'기술머신'}
-function bestOf(list,my,defs){return list.map(function(x){return {n:x.n,elite:x.elite,v:moveMult(x.n,my,defs)}}).sort(function(a,b){return b.v-a.v||(a.elite?1:0)-(b.elite?1:0)})}
+var SPECIALMV={'은혜갚기':'정화하면 배움','화풀이':'섀도우 전용'};
+function bestOf(list,my,defs){return list.filter(function(x){return !SPECIALMV[x.n]}).map(function(x){return {n:x.n,elite:x.elite,v:moveMult(x.n,my,defs)}}).sort(function(a,b){return b.v-a.v||(a.elite?1:0)-(b.elite?1:0)})}
 /* 구체적인 기술 추천: {tm:[문장], unlock:문장|null} */
 function moveAdvice(x,opps){var sp=x.m.species,L=LS[sp];if(!L||!x.st)return null;var my=x.st.types;
  var cur={fast:x.m.fast,ch:(x.m.charged||[]).filter(Boolean)};var out=[],unlock=null;
@@ -649,7 +650,7 @@ function closeModal(){var b=document.querySelector('.modalbg');if(b)b.remove();i
 var MORE={};
 function moveOpts(kind,types,sel,sp,more){var all=Object.keys(MOVES).filter(function(n){return MOVES[n].kind===kind});
  var L=sp&&LS[sp];if(L){var lst=(kind==='fast'?L.fast:L.ch).filter(function(x){return MOVES[x.n]});var rec=kind==='fast'?[L.rec.fast]:L.rec.ch;
-  var h0='<option value="">'+(kind==='fast'?'노말어택 선택':'스페셜어택 (없음)')+'</option><optgroup label="배울 수 있는 기술">'+lst.map(function(x){return '<option value="'+esc(x.n)+'"'+(x.n===sel?' selected':'')+'>'+(rec.indexOf(x.n)>=0?'👍 ':'')+esc(x.n)+' ('+MOVES[x.n].type+')'+(x.elite?' · 대단한 기술머신':'')+(gradeText(x.n,kind)?' · '+gradeText(x.n,kind):'')+'</option>'}).join('')+'</optgroup>';
+  var h0='<option value="">'+(kind==='fast'?'노말어택 선택':'스페셜어택 (없음)')+'</option><optgroup label="배울 수 있는 기술">'+lst.map(function(x){return '<option value="'+esc(x.n)+'"'+(x.n===sel?' selected':'')+'>'+(rec.indexOf(x.n)>=0?'👍 ':'')+esc(x.n)+' ('+MOVES[x.n].type+')'+(SPECIALMV[x.n]?' · '+SPECIALMV[x.n]:x.elite?' · 대단한 기술머신':'')+(gradeText(x.n,kind)?' · '+gradeText(x.n,kind):'')+'</option>'}).join('')+'</optgroup>';
   var names=lst.map(function(x){return x.n});var others=all.filter(function(n){return names.indexOf(n)<0}).sort();
   if(!more){if(sel&&others.indexOf(sel)>=0)h0+='<option value="'+esc(sel)+'" selected>'+esc(sel)+' ('+MOVES[sel].type+')</option>';h0+='<option value="__more">➕ 다른 기술 보기</option>';if(sel&&!MOVES[sel])h0+='<option selected value="'+esc(sel)+'">'+esc(sel)+' (미등록)</option>';return h0}
   h0+='<optgroup label="그 밖의 기술">'+others.map(function(n){return '<option value="'+esc(n)+'"'+(n===sel?' selected':'')+'>'+esc(n)+' ('+MOVES[n].type+')'+(gradeText(n,kind)?' · '+gradeText(n,kind):'')+'</option>'}).join('')+'</optgroup>';
@@ -665,6 +666,12 @@ function moveOpts(kind,types,sel,sp,more){var all=Object.keys(MOVES).filter(func
 /* ---------- 사진(캡처) 인식 ---------- */
 var _ocrW=null;
 function loadScript(u){return new Promise(function(ok,no){if(window.Tesseract)return ok();var sc=document.createElement('script');sc.src=u;sc.onload=ok;sc.onerror=no;document.head.appendChild(sc)})}
+var _cpW=null;
+function cpWorker(){if(_cpW)return _cpW;_cpW=loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js').then(function(){return Tesseract.createWorker('eng')}).then(function(w){return Promise.resolve(w.setParameters?w.setParameters({tessedit_char_whitelist:'0123456789',tessedit_pageseg_mode:'7'}):0).then(function(){return w})});_cpW.catch(function(){_cpW=null});return _cpW}
+function cpCrop(im){var W=im.naturalWidth,H=im.naturalHeight;var sx=Math.round(W*0.40),sy=Math.round(H*0.045),sw=Math.round(W*0.24),sh=Math.round(H*0.053);
+ var sc=Math.max(1,Math.min(3,400/sw));var c=document.createElement('canvas');c.width=Math.round(sw*sc);c.height=Math.round(sh*sc);var x=c.getContext('2d');x.drawImage(im,sx,sy,sw,sh,0,0,c.width,c.height);
+ var d=x.getImageData(0,0,c.width,c.height),p=d.data;for(var i=0;i<p.length;i+=4){var v=Math.min(p[i],p[i+1],p[i+2])>200?0:255;p[i]=p[i+1]=p[i+2]=v;p[i+3]=255}x.putImageData(d,0,0);return c}
+function readCP(im){return cpWorker().then(function(w){return w.recognize(cpCrop(im)).then(function(r){var m=(r.data.text||'').replace(/\D/g,'');var v=+m;return (m.length>=2&&m.length<=5&&v>=10&&v<=10000)?v:null})}).catch(function(){return null})}
 function ocrWorker(){if(_ocrW)return _ocrW;_ocrW=loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js').then(function(){return Tesseract.createWorker('kor+eng')});_ocrW.catch(function(){_ocrW=null});return _ocrW}
 function imgOf(file){return new Promise(function(ok,no){var u=URL.createObjectURL(file),im=new Image();im.onload=function(){ok(im)};im.onerror=no;im.src=u})}
 function ivBars(im){/* 평가 화면의 주황/빨강 막대 길이 → 0~15 */
@@ -699,13 +706,15 @@ function parseOCR(text){var t=text.replace(/[ \t]+/g,'');var out={};
  var picked=[];mv.forEach(function(n){if(!picked.some(function(p){return p.indexOf(n)>=0}))picked.push(n)});
  var pos={};picked.forEach(function(n){pos[n]=t.indexOf(n)});
  function lev(x,y){var m=x.length,k=y.length,d=[],i,j;for(i=0;i<=m;i++){d[i]=[i]}for(j=0;j<=k;j++)d[0][j]=j;for(i=1;i<=m;i++)for(j=1;j<=k;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(x[i-1]===y[j-1]?0:1));return d[m][k]}
- var allMv=Object.keys(MOVES),off=0;text.split(/\n/).forEach(function(line){var L=line.replace(/[^가-힣0-9A-Za-z()]/g,'');var at=t.indexOf(line.replace(/[ \t]+/g,''));
-  if(L.length<3||L.length>9||picked.some(function(p){return L.indexOf(p)>=0}))return;
-  var best=null,bd=9;allMv.forEach(function(n){if(Math.abs(n.length-L.length)>1||n.length<3)return;var dd=lev(L,n);if(dd<bd){bd=dd;best=n}});
-  if(best&&bd<=1&&picked.indexOf(best)<0){picked.push(best);pos[best]=at>=0?at:1e6}});
+ var allMv=Object.keys(MOVES),off=0;text.split(/\n/).forEach(function(line){var at=t.indexOf(line.replace(/[ \t]+/g,''));
+  var cands=[line.replace(/[^가-힣0-9A-Za-z()]/g,''),line.replace(/[^가-힣]/g,'')].concat(line.split(/\s+/).map(function(w){return w.replace(/[^가-힣0-9()]/g,'')}));
+  var best=null,bd=9;cands.forEach(function(L){if(L.length<3||L.length>9||/^거?다이/.test(L)||picked.some(function(p){return L.indexOf(p)>=0}))return;
+   allMv.forEach(function(n){if(Math.abs(n.length-L.length)>1||n.length<3)return;var dd=lev(L,n);if(dd<bd){bd=dd;best=n}})});
+  if(best&&bd<=1&&picked.indexOf(best)<0&&!picked.some(function(p){return line.replace(/\s/g,'').indexOf(p)>=0})){picked.push(best);pos[best]=at>=0?at:1e6}});
  picked.sort(function(a,b){return pos[a]-pos[b]});
  out.fast=picked.filter(function(n){return MOVES[n].kind==='fast'})[0];out.ch=picked.filter(function(n){return MOVES[n].kind==='charged'}).slice(0,2);
- if(/섀도우|섀도/.test(t)&&!/정화/.test(t))out.shadow=true;return out}
+ if(/섀도우|섀도/.test(t)&&!/정화/.test(t))out.shadow=true;
+ if(/거다이맥스|거다이[가-힣]{1,4}/.test(t))out.max='giga';else if(/다이맥스|맥스기술|맥스파워|다이(어택|번|스트림|썬더|그래스|아이스|너클|애시드|어스|제트|사이코|웜|록|할로우|드라군|아크|스틸|페어리|월)/.test(t))out.max='dyna';return out}
 function ocrFiles(files,progress){var res={ch:[]};
  return ocrWorker().catch(function(){return null}).then(function(w){var seq=Promise.resolve();files.forEach(function(f,i){seq=seq.then(function(){progress('사진 '+(i+1)+'/'+files.length+' 읽는 중…');
    return imgOf(f).then(function(im){var iv=null;try{iv=ivBars(im)}catch(e){}
@@ -713,8 +722,9 @@ function ocrFiles(files,progress){var res={ch:[]};
     if(!w)return;
     return w.recognize(im).then(function(r){var p=parseOCR(r.data.text||'');
      if(p.species&&!res.species)res.species=p.species;if(p.cp&&!res.cp)res.cp=p.cp;if(p.fast&&!res.fast)res.fast=p.fast;
-     p.ch.forEach(function(c){if(res.ch.length<2&&res.ch.indexOf(c)<0)res.ch.push(c)});if(p.shadow)res.shadow=true}).catch(function(){})})})});
-  return seq.then(function(){if(!w)res.noText=true;return res})})}
+     p.ch.forEach(function(c){if(res.ch.length<2&&res.ch.indexOf(c)<0)res.ch.push(c)});if(p.shadow)res.shadow=true;if(p.max&&(!res.max||p.max==='giga'))res.max=p.max;
+     return readCP(im).then(function(cp){if(cp&&!res.cpCrop)res.cpCrop=cp})}).catch(function(){})})})});
+  return seq.then(function(){if(!w)res.noText=true;if(res.cpCrop)res.cp=res.cpCrop;return res})})}
 function monForm(mode,m,flash){m=m||{};var title={add:'포켓몬 추가',edit:'정보 수정',evolve:'진화',power:'강화',moves:'기술 변경'}[mode];
  var showSpecies=mode==='add'||mode==='edit'||mode==='evolve',showCP=mode!=='moves',showMoves=mode!=='power',showMisc=mode==='add'||mode==='edit';
  var h='<h2>'+title+'</h2>'+(mode!=='add'?'<div class="muted">'+esc(monName(m))+' · CP '+m.cp+'</div>':'');
@@ -763,6 +773,7 @@ function monForm(mode,m,flash){m=m||{};var title={add:'포켓몬 추가',edit:'�
      if(r.cp&&$('f_cp')){$('f_cp').value=r.cp;got.push('CP')}
      if(r.iv&&$('f_i0')){['f_i0','f_i1','f_i2'].forEach(function(id,k){$(id).value=r.iv[k]});ivLive();got.push('공방체')}
      if(r.shadow&&$('f_sh')){$('f_sh').checked=true;got.push('섀도')}
+     if(r.max&&$('f_max')){$('f_max').value=r.max;got.push(r.max==='giga'?'거다이맥스':'다이맥스')}
      if(showMoves){refreshMoves();var t=curTypes(),spn=showSpecies?$('f_sp').value.trim():m.species;
       [['f_fast','fast',r.fast],['f_c1','charged',r.ch[0]],['f_c2','charged',r.ch[1]]].forEach(function(a){if(!a[2])return;var el=$(a[0]);
        el.innerHTML=moveOpts(a[1],t,a[2],spn,MORE[a[0]]);el.value=a[2];if(el.value!==a[2]){MORE[a[0]]=true;el.innerHTML=moveOpts(a[1],t,a[2],spn,true);el.value=a[2]}el.dataset.prev=el.value;got.push(a[0]==='f_fast'?'노말어택':'스페셜어택')})}
