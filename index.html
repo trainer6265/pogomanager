@@ -708,7 +708,9 @@ function ivBars(im){/* 평가 화면의 주황/빨강 막대 길이 → 0~15 */
  /* 같은 막대의 연속된 줄 묶기 */
  var bars=[];rows.forEach(function(r){var b=bars[bars.length-1];
   if(b&&r.y-b.y<=3&&Math.abs(r.s-b.s)<W*0.03&&Math.abs(r.e-b.e)<W*0.03){b.v.push(r.v);b.y=r.y}else bars.push({y:r.y,y0:r.y,s:r.s,e:r.e,v:[r.v]})});
- bars=bars.filter(function(b){return b.v.length>=Math.max(3,H*0.004)&&b.v.length<=H*0.025});
+ function whiteAt(y,s0,e0){if(y<0||y>=H)return 0;var n=0,w=0;for(var X=s0;X<=e0;X+=3){var i=(y*W+X)*4;n++;if(Math.min(d[i],d[i+1],d[i+2])>232)w++}return n?w/n:0}
+ bars=bars.filter(function(b){if(!(b.v.length>=Math.max(3,H*0.004)&&b.v.length<=H*0.025))return false;var gap=Math.max(3,Math.round(H*0.004));
+  return whiteAt(b.y0-gap,b.s,b.e)>0.8&&whiteAt(b.y+gap,b.s,b.e)>0.8});
  for(var i=0;i+2<bars.length;i++){var A=bars[i],B=bars[i+1],C=bars[i+2];
   var g1=B.y0-A.y0,g2=C.y0-B.y0;if([B,C].every(function(z){return Math.abs(z.s-A.s)<W*0.04&&Math.abs(z.e-A.e)<W*0.04})&&C.y-A.y<H*0.3&&g1>0&&Math.abs(g1-g2)<=Math.max(g1,g2)*0.3)
    return [A,B,C].map(function(z){var v=z.v.slice().sort(function(p,q){return p-q})[Math.floor(z.v.length/2)];return Math.max(0,Math.min(15,Math.round(v*15)))})}
